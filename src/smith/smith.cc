@@ -50,32 +50,32 @@ Smith::Smith(const shared_ptr<const PTree> idata, shared_ptr<const Geometry> g, 
   // make a smith_info class
   auto info = make_shared<const SMITH_Info<double>>(r, idata);
 
+  if (idata->get<bool>("_grad", false) && !info->do_ms() && r->nstate() > 1)
+    throw runtime_error("CASPT2 nuclear gradients are not implemented for SS-CASPT2 with multiple reference states");
+
   {
     // print memory requirements
     const size_t nact = r->nact();
-    const size_t nact2 = nact * nact;
-    const size_t nact4 = nact2 * nact2;
-    const size_t nact6 = nact4 * nact2;
     const size_t nstate = r->nstate();
     const size_t nclosed = r->nclosed() - info->ncore();
     const size_t nvirtual = r->nvirt() - info->nfrozenvirt();
     const size_t nocc = nclosed + nact;
     const size_t norb = nocc + nvirtual;
-    const size_t rsize = nclosed*nocc*nvirtual*nvirtual + nclosed*nclosed*nact*(nvirtual+nact) + nact2*(norb*nvirtual+nact*nclosed);
-    cout << "    * Approximate memory requirement for SMITH calulation per MPI process:" << endl;
+    const size_t rsize = nclosed*nocc*nvirtual*nvirtual + nclosed*nclosed*nact*(nvirtual+nact) + pow(nact,2)*(norb*nvirtual+nact*nclosed);
+    cout << "    * Approximate memory requirement for SMITH calculation per MPI process:" << endl;
     cout << "      o Storage requirement for T-amplitude, lambda, and residual is ";
     if (info->orthogonal_basis()) {
-      // T-amp (r, o), Lambda (r, o), Residual (r, o)
-      cout << setprecision(2) << rsize*(info->sssr() ? nstate : nstate*nstate) * (info->grad() ? 6 : 4) * 8.e-9 / mpi__->size() << " GB" << endl;
+      // During iteration      : davidson_subspace * (Lambda or T (ortho) + Residual (ortho)) * nstate + (T-amp(orthogonal, redundant) + Res + Lambda) * nstate * nstate
+      cout << setprecision(2) << (info->davidson_subspace() * 2 + nstate * (4 + info->grad() ? 2 : 0)) * rsize * (info->sssr() ? 1 : nstate) * 8.e-9 / mpi__->size() << " GB" << endl;
     } else {
-      // T-amp (r), Lambda (r), Residual (r)
-      cout << setprecision(2) << rsize*(info->sssr() ? nstate : nstate*nstate) * (info->grad() ? 3 : 2) * 8.e-9 / mpi__->size() << " GB" << endl;
+      // During iteration      : davidson_subspace * (Lambda or T (redun) + Residual (r)) * nstate + (T-amp(r) + Res + Lambda) * nstate * nstate
+      cout << setprecision(2) << (info->davidson_subspace() * 2 + nstate * (2 + info->grad() ? 1 : 0)) * rsize * (info->sssr() ? 1 : nstate) * 8.e-9 / mpi__->size() << " GB" << endl;
     }
     cout << "      o Storage requirement for MO integrals is ";
     cout << setprecision(2) << (norb*norb*2 + nocc*nocc*(nact+nvirtual)*(nact+nvirtual)) * 8.e-9 / mpi__->size() << " GB" << endl;
     if (info->grad()) {
       cout << "      o Storage requirement for SMITH-computed gradient tensors is ";
-      cout << setprecision(2) << nstate*nstate*(nact6*2 + nact4 + nact2 + 1) * 8.e-9 << " GB" << endl;
+      cout << setprecision(2) << nstate*nstate*(pow(nact,6)*2 + pow(nact,4) + pow(nact,2) + 1) * 8.e-9 << " GB" << endl;
     }
   }
 
