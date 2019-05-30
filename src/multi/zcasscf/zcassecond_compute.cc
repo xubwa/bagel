@@ -213,6 +213,10 @@ void ZCASSecond_base::compute() {
   muffle_->unmute();
   if (nact_ && external_rdm_.empty()) {
     fci_->update(coeff_);
+    if (idata_->get_child_optional("shci")) {
+      //Triggers an one-step accurate shci calculation.
+      fci_->final_step();
+    }
     fci_->compute();
     fci_->compute_rdm12();
   }

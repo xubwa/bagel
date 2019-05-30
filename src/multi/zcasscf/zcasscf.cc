@@ -27,6 +27,7 @@
 #include <src/scf/dhf/dfock.h>
 #include <src/util/math/quatmatrix.h>
 #include <src/ci/zfci/relfci.h>
+#include <src/ci/zfci/zshci.h>
 #include <src/multi/zcasscf/zcasscf.h>
 #include <src/mat1e/giao/relhcore_london.h>
 #include <src/mat1e/giao/reloverlap_london.h>
@@ -154,8 +155,13 @@ void ZCASSCF::init() {
 
   muffle_ = make_shared<Muffle>("casscf.log");
   // CASSCF methods should have FCI member. Inserting "ncore" and "norb" keyword for closed and active orbitals.
-  if (nact_)
-    fci_ = make_shared<RelFCI>(idata_, geom_, ref_, nclosed_, nact_, coeff_, /*store*/true);
+  if (nact_) {
+    if(!idata_->get_child_optional("shci"))                                             
+      fci_ = make_shared<RelFCI>(idata_, geom_, ref_, nclosed_, nact_, coeff_, /*store*/true);
+    else {                                                                              
+      fci_ = make_shared<ZSHCI>(idata_, geom_, ref_, nclosed_, nact_, coeff_, /*store*/true);
+    }                                                                                   
+  }
   nstate_ = nact_ ? fci_->nstate() : 1;
   energy_.resize(nstate_);
   muffle_->unmute();

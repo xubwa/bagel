@@ -92,7 +92,10 @@ class ZHarrison : public Method {
     // restart
     bool restart_;
     bool restarted_;
-
+    
+    // triggers shci tight
+    bool tight_;
+    bool first_iter_;
   private:
     friend class boost::serialization::access;
     template<class Archive>
@@ -180,7 +183,6 @@ class ZHarrison : public Method {
 
     virtual void update(std::shared_ptr<const ZCoeff_Block> coeff) = 0;
     virtual void compute() override;
-
     // returns members
     int norb() const { return norb_; }
     int ncore() const { return ncore_; }
@@ -198,7 +200,7 @@ class ZHarrison : public Method {
     std::shared_ptr<const ZMOFile> jop() const { return jop_; }
 
     // functions related to RDMs
-    void compute_rdm12();
+    virtual void compute_rdm12();
     std::shared_ptr<Kramers<2,ZRDM<1>>> rdm1(const int jst, const int ist) const;
     std::shared_ptr<Kramers<4,ZRDM<2>>> rdm2(const int jst, const int ist) const;
     std::shared_ptr<Kramers<6,ZRDM<3>>> rdm3(const int jst, const int ist) const;
@@ -218,10 +220,12 @@ class ZHarrison : public Method {
     void rotate_rdms(std::shared_ptr<const ZMatrix> trans);
 
     // interface functions
+    void final_step() { tight_ = true; };
+    void first_iter( int iter ) { first_iter_=!iter; return; };
     void dump_ints() const;
     void read_external_rdm12_av(const std::string& file);
-    std::shared_ptr<Kramers<2,ZRDM<1>>> read_external_rdm1(const int ist, const int jst, const std::string& file) const;
-    std::shared_ptr<Kramers<4,ZRDM<2>>> read_external_rdm2(const int ist, const int jst, const std::string& file) const;
+    virtual std::shared_ptr<Kramers<2,ZRDM<1>>> read_external_rdm1(const int ist, const int jst, const std::string& file) const;
+    virtual std::shared_ptr<Kramers<4,ZRDM<2>>> read_external_rdm2(const int ist, const int jst, const std::string& file) const;
     std::shared_ptr<Kramers<6,ZRDM<3>>> read_external_rdm3(const int ist, const int jst, const std::string& file, const bool fock_contracted = false) const;
     std::shared_ptr<Kramers<8,ZRDM<4>>> read_external_rdm4(const int ist, const int jst, const std::string& file) const;
 };
