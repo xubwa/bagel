@@ -7,10 +7,11 @@ Molecular geometry optimization
 Description
 ===========
 Three types of the geometry can be optimized: the most stable (minimum energy) geometry, conical intersections between the electronic states, and
-the transition state geometry (or the saddle point on the potential energy surface).
+the transition state (TS) geometry (or the saddle point on the potential energy surface).
 
 In the optimizations, rather than using the exact Hessian, one can
 start using the approximate Hessian and update it according to the step taken.
+In the transition state search, the exact Hessian usually improves the convergence.
 The advanced quasi-newton optimization methods, eigenvector following (EF) algorithm and rational functional optimization (RFO) are implemented.
 In the minimum energy conical intersection (MECI) optimization, the
 molecular gradient is replaced by the sum of the energy difference gradient and the upper state gradient after projecting the
@@ -117,7 +118,7 @@ Optional Keywords (Universal)
 
    | **Description:** Maximum step. The unit is in the specifed coordinate.
    | **Datatype:** double precision.
-   | **Default:** 0.3 (energy optimization); 0.1 (otherwise).
+   | **Default:** 0.3 (energy or TS optimization); 0.1 (CI optimization).
 
 .. topic:: ``internal``
 
@@ -152,6 +153,20 @@ Optional Keywords (Universal)
    | **Default:** 100.
    | **Recommendation:** increase the value when the Z-vector equation does not converge.
 
+.. topic:: ``explicitbond``
+
+   | **Description:** Add explicit bonds between non-bonded atoms.
+   | **Datatype:** bool
+   | **Values:**
+   |    ``true``: add explicit bonds. ("explicit" block required, see below for example)
+   |    ``false``: do not add explicit bonds.
+   | **Default:** false.
+   | **Recommendation:** use default unless you are optimizing two molecules.
+
+.. topic:: ``explicit``
+
+   | **Description:** Specifies the explicit bonds. See below for example.
+
 .. topic:: ``numerical``
 
    | **Description:** Use numerical gradient.
@@ -176,7 +191,9 @@ Optional Keywords (Universal)
    |    ``bfgs``: use BFGS scheme.
    |    ``psb``: use PSB scheme.
    |    ``sr1``: use SR1 scheme.
-   | **Default:** flowchart.
+   |    ``bofill``: use the Bofill's scheme for combining PSB and SR1.
+   |    ``noupdate``: does not update Hessian at all.
+   | **Default:** flowchart for energy and conical intersection optimization; bofill for transition state optimization.
 
 .. topic:: ``hess_approx``
 
@@ -186,6 +203,12 @@ Optional Keywords (Universal)
    |    ``true``: use approximate Hessian.
    |    ``false``: calculate numerical Hessian first, and start the optimization using the Hessian.
    | **Default:** true.
+   | **Recommendation:** Using false substantially increases computational cost, and improves convergence in some cases (especially in TS optimization).
+
+.. topic:: ``hess_recalc_freq``
+   | **Description:** When hess_approx is false, recalculate the exact Hessian every hess_recalc_freq steps.
+   | **Datatype:** int
+   | **Default:** 5 (steps).
 
 .. topic:: ``adaptive``
 
@@ -374,6 +397,66 @@ In this example, we optimize the ground state.
 
    ]}
 
+
+Example: Explicit bond
+======================
+This optimizes the ground state geometry of a benzene dimer using MP2.
+The internal coordinates complemented by two explicit bonds between the carbon atoms in the monomers are used.
+
+.. code-block:: javascript
+
+  { "bagel" : [
+
+  {
+    "title" : "molecule",
+    "basis" : "sto-3g",
+    "df_basis" : "svp",
+    "angstrom" : false,
+    "geometry" : [
+      {"atom" :"C", "xyz" : [    0.00000000000000,     0.00000000000000,     2.64112304663605] },
+      {"atom" :"C", "xyz" : [    2.28770766388446,     0.00000000000000,     1.32067631141874] },
+      {"atom" :"C", "xyz" : [    2.28770047235649,     0.00000000000000,    -1.32071294538560] },
+      {"atom" :"C", "xyz" : [    0.00000000000000,     0.00000000000000,    -2.64114665444819] },
+      {"atom" :"C", "xyz" : [   -2.28770047235649,     0.00000000000000,    -1.32071294538560] },
+      {"atom" :"C", "xyz" : [   -2.28770766388446,     0.00000000000000,     1.32067631141874] },
+      {"atom" :"H", "xyz" : [    4.07221260176630,     0.00000000000000,     2.35164689765998] },
+      {"atom" :"H", "xyz" : [    4.07221517814719,     0.00000000000000,    -2.35163163881380] },
+      {"atom" :"H", "xyz" : [    0.00000000000000,     0.00000000000000,    -4.70191324441092] },
+      {"atom" :"H", "xyz" : [   -4.07221517814719,     0.00000000000000,    -2.35163163881380] },
+      {"atom" :"H", "xyz" : [   -4.07221260176630,     0.00000000000000,     2.35164689765998] },
+      {"atom" :"H", "xyz" : [    0.00000000000000,     0.00000000000000,     4.70197960246451] },
+      {"atom" :"C", "xyz" : [    0.00000000000000,     4.00000000000000,     2.64112304663605] },
+      {"atom" :"C", "xyz" : [    2.28770766388446,     4.00000000000000,     1.32067631141874] },
+      {"atom" :"C", "xyz" : [    2.28770047235649,     4.00000000000000,    -1.32071294538560] },
+      {"atom" :"C", "xyz" : [    0.00000000000000,     4.00000000000000,    -2.64114665444819] },
+      {"atom" :"C", "xyz" : [   -2.28770047235649,     4.00000000000000,    -1.32071294538560] },
+      {"atom" :"C", "xyz" : [   -2.28770766388446,     4.00000000000000,     1.32067631141874] },
+      {"atom" :"H", "xyz" : [    4.07221260176630,     4.00000000000000,     2.35164689765998] },
+      {"atom" :"H", "xyz" : [    4.07221517814719,     4.00000000000000,    -2.35163163881380] },
+      {"atom" :"H", "xyz" : [    0.00000000000000,     4.00000000000000,    -4.70191324441092] },
+      {"atom" :"H", "xyz" : [   -4.07221517814719,     4.00000000000000,    -2.35163163881380] },
+      {"atom" :"H", "xyz" : [   -4.07221260176630,     4.00000000000000,     2.35164689765998] },
+      {"atom" :"H", "xyz" : [    0.00000000000000,     4.00000000000000,     4.70197960246451] }
+    ]
+  },
+
+  {
+    "title" : "optimize",
+    "target" : 0,
+    "explicitbond" : true,
+    "explicit" : [ 
+      { "pair" : [1, 13]},
+      { "pair" : [4, 17]}
+  ],
+  "method" : [ {
+    "title" : "mp2"
+  } ]
+  }
+
+  ]}
+
+
+
 References
 ==========
 
@@ -389,6 +472,8 @@ References
 | Gradient projection algorithm                 | M\. J. Bearpark, M. A. Robb, and H. B. Schlegel, Chem. Phys. Lett. **223**, 269 (1994).  |
 +-----------------------------------------------+------------------------------------------------------------------------------------------+
 | Flowchart method                              | A\. B. Birkholz and H. B. Schlegel, Theor. Chem. Acc. **135**, 84 (2016).                |
++-----------------------------------------------+------------------------------------------------------------------------------------------+
+| The Bofill's update for TS optimization       | J\. M. Bofill, J. Comput. Chem. **15**, 1 (1994).                                        |
 +-----------------------------------------------+------------------------------------------------------------------------------------------+
 | ETF in nonadiabatic coupling                  | S\. Fatehi and J. E. Subotnik, J. Phys. Chem. Lett. **3**, 2039 (2012).                  |
 +-----------------------------------------------+------------------------------------------------------------------------------------------+
