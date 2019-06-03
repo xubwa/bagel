@@ -98,6 +98,28 @@ void ZHarrison::dump_ints() const {
     fs.close();
   }
   else throw runtime_error("Unable to open file: ZHarrison::dump_ints");
+
+  fs = ofstream("FCIDUMP.bin", ios::out | ios::binary | ios::trunc);
+  if (fs.is_open()) {
+    for (int i=0; i!=16; ++i) {
+      shared_ptr<const ZMatrix> tmp;
+      if (!jop_->mo2e()->exist(i)) tmp = make_shared<const ZMatrix>(norb_*norb_, norb_*norb_);
+      else tmp = jop_->mo2e(i);
+      //fs.write((char*) (&i), sizeof(int));
+      fs.write((char*) tmp->data(), pow(norb_, 4)*sizeof(complex<double>));
+    }
+    for (int i=0; i!=4; ++i) {
+      shared_ptr<const ZMatrix> tmp;
+      if (!jop_->mo1e()->exist(i)) tmp = make_shared<const ZMatrix>(norb_, norb_);
+      else tmp = jop_->mo1e(i);
+      fs.write((char*) tmp->data(), pow(norb_, 2)*sizeof(complex<double>));
+    }
+    complex<double> coreE = jop_->core_energy()+geom_->nuclear_repulsion();
+    cout << coreE << endl;
+    fs.write((char*) (&coreE), sizeof(complex<double>));
+    fs.close();
+  }
+  else throw runtime_error("Unable to open file: ZHarrison::dump_ints");
 }
 
 
