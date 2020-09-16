@@ -92,7 +92,8 @@ class ZHarrison : public Method {
     // restart
     bool restart_;
     bool restarted_;
-    
+  
+  public: 
     // triggers shci tight
     bool tight_;
     bool first_iter_;

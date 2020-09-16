@@ -32,6 +32,7 @@
 #include <src/ci/fci/knowles.h>
 #include <src/ci/ras/rasci.h>
 #include <src/ci/zfci/relfci.h>
+#include <src/ci/zfci/zshci.h>
 #include <src/ci/zfci/fci_london.h>
 #include <src/response/cis.h>
 #include <src/pt2/nevpt2/nevpt2.h>
@@ -87,6 +88,7 @@ get_energy(const string title, shared_ptr<const PTree> itree, shared_ptr<const G
     else if (title == "smith" || title == "relsmith")   { throw runtime_error("SMITH module was not activated during compilation."); }
 #endif
     else if (title == "zfci")    { auto m = make_shared<RelFCI>(itree, geom, ref);    m->compute();   out = m->energy(target);           ref = m->conv_to_ref(); }
+    else if (title == "zshci")   { auto m = make_shared<ZSHCI>(itree, geom, ref);    m->compute();   out = m->energy(target);           ref = m->conv_to_ref(); }
     else if (title == "ras") {
       const string algorithm = itree->get<string>("algorithm", "");
       if ( algorithm == "local" || algorithm == "" ) { auto m = make_shared<RASCI>(itree, geom, ref); m->compute(); out = m->energy(target); ref = m->conv_to_ref(); }

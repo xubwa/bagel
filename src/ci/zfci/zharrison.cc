@@ -81,9 +81,6 @@ ZHarrison::ZHarrison(shared_ptr<const PTree> idat, shared_ptr<const Geometry> g,
   cout << "    * nact     : " << setw(6) << norb_ << endl;
   cout << "    * nvirt    : " << setw(6) << (coeff_zcas ? coeff_zcas->mdim() : geom_->nbasis()-ncore_-norb_) << endl << endl;
 
-  space_ = make_shared<RelSpace>(norb_, nele_);
-  int_space_ = make_shared<RelSpace>(norb_, nele_-2, /*mute*/true, /*link up*/true);
-
 }
 
 

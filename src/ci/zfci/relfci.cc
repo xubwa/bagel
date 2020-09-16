@@ -33,6 +33,9 @@ RelFCI::RelFCI(shared_ptr<const PTree> a, shared_ptr<const Geometry> g, shared_p
                const int ncore, const int nocc, shared_ptr<const ZCoeff_Block> coeff_zcas, const bool store_c, const bool store_g)
  : ZHarrison(a, g, b, ncore, nocc, coeff_zcas, store_c, store_g) {
 
+  space_ = make_shared<RelSpace>(norb_, nele_);
+  int_space_ = make_shared<RelSpace>(norb_, nele_-2, /*mute*/true, /*link up*/true);
+
   auto rr = dynamic_pointer_cast<const RelReference>(ref_);
   if (!rr) throw runtime_error("RelFCI requires a relativistic reference object");
 

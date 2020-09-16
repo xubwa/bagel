@@ -14,6 +14,7 @@ class ZSHCI : public ZHarrison {
     bool breit_;
     // To do a one step tight perturbation calculation using Dice.
     bool tight_;
+    bool do_rdm_;
     
     void dump_integrals_and_exit() const override;
     void dump_integrals() const;

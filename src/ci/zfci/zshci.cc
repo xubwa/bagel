@@ -19,11 +19,6 @@ ZSHCI::ZSHCI(shared_ptr<const PTree> p, shared_ptr<const Geometry> g, shared_ptr
   gaunt_ = idata_->get<bool>("gaunt", rr->gaunt());
   breit_ = idata_->get<bool>("breit", rr->breit());
 
-  shci_data_ = idata_->get_child_optional("shci");
-  if (!shci_data_) throw runtime_error("ZSHCI requires a subblock to initialize Dice parameters");
-  tight_ = false;
-  first_iter_ = false;
-
   cout << "    * Relativistic FCI" << endl;
   cout << "    * " << nele_ << " active electrons in " << norb_ << " orbitals."  << endl;
   cout << "    * gaunt    : " << (gaunt_ ? "true" : "false") << endl;
@@ -37,11 +32,23 @@ ZSHCI::ZSHCI(shared_ptr<const PTree> p, shared_ptr<const Geometry> g, shared_ptr
     coeff = init_coeff();
   update(coeff);
 
+  if (idata_->get<bool>("only_ints", false)) {
+    dump_integrals();
+    throw Termination("Relativistic MO are dumped onto integrals");
+  }
+
+  shci_data_ = idata_->get_child_optional("shci");
+  if (!shci_data_) throw runtime_error("ZSHCI requires a subblock to initialize Dice parameters");
+  if (idata_->get<string>("title") == "zcasscf") do_rdm_ = true;
+  if (idata_->get<string>("title") == "zshci"  ) do_rdm_ = false;
+  tight_ = false;
+  first_iter_ = false;
+
   // A few lines to deal with Dice parameters
   // Currently I would suppose input is provided and the only option is whether to generate guess determinant for Dice input
   //generate_guess_ = idata_->get<bool>("generate_guess", false);
-  rdm_file_ = shci_data_->get<string>("rdm_file", "Dice");
-  dice_dir_ = shci_data_->get<string>("Dice_exe", "ZDice2");
+  rdm_file_  = shci_data_->get<string>("rdm_file", "Dice");
+  dice_dir_  = shci_data_->get<string>("Dice_exe", "ZDice2");
   mpiprefix_ = shci_data_->get<string>("mpiprefix", "");
 }
 
@@ -95,6 +102,7 @@ void ZSHCI::clean() {
   // cleaning up Dice temp files
   system("rm Dice_*rdm*");
   system("rm FCIDUMP");
+
   system("rm *.bkp");
   return;
 }
@@ -102,7 +110,6 @@ void ZSHCI::clean() {
 shared_ptr<const ZCoeff_Block> ZSHCI::init_coeff() {
   auto rr = dynamic_pointer_cast<const RelReference>(ref_);
   assert(rr);
-
   auto scoeff = make_shared<const ZCoeff_Striped>(*rr->relcoeff_full(), ncore_, norb_, rr->relcoeff_full()->mdim()/4-ncore_-norb_, rr->relcoeff_full()->mdim()/2);
   
   const shared_ptr<const PTree> iactive = idata_->get_child_optional("active");
@@ -161,7 +168,7 @@ void ZSHCI::compute() {
   write_dice_input();
   //clean();
   dump_integrals();
-  string dice_call = mpiprefix_ + " " + dice_dir_ + " input.dat > output.dat" ;//+ "/RelDice";
+  string dice_call = mpiprefix_ + " " + dice_dir_ + " input.dat >> output.dat" ;//+ "/RelDice";
   const char* command = dice_call.c_str();
   cout << command << endl;
   ifstream out_file("output.dat");
@@ -290,7 +297,7 @@ std::shared_ptr<Kramers<4,ZRDM<2>>> ZSHCI::read_external_rdm2(const int ist, con
 
   map<array<int,2>, double> elem;
   elem.emplace(array<int,2>{{0,1}}, 1.0); elem.emplace(array<int,2>{{1,0}},-1.0);
-
+  #pragma omp for
   for (int ij=0; ij<norbs*norbs; ij++) {
     for (int kl=0; kl<norbs*norbs; kl++) {
       const int i=ij/norbs;
@@ -402,17 +409,18 @@ void ZSHCI::write_dice_input() {
   int maxiter = sweep_iter[sweep_iter.size()-1]+6;
   bool io = shci_data_->get<bool>("diskio", false);
   bool restart = shci_data_->get<bool>("restart", false);
+  bool fullrestart = shci_data_->get<bool>("fullrestart", false);
   bool stochastic = shci_data_->get<bool>("stochasticPT", false);
   bool trev = shci_data_->get<bool>("Treversal", 0);
-  int PTiter = shci_data_->get<int>("PTiter", maxiter);
+  int PTiter = shci_data_->get<int>("PTiter", 0);
   double davidsonTol = shci_data_->get<double>("davidson", 1e-7);
   double davidsonTolLoose = shci_data_->get<double>("davidsonLoose",  1e-5);
-  double epsilon2 = shci_data_->get<double>("epsilon2", 1e-7);
-  double epsilon2Large = shci_data_->get<double>("epsilon2Large", 1000.);
+  double epsilon2 = shci_data_->get<double>("epsilon2", 1e-10);
+  double epsilon2Large = shci_data_->get<double>("epsilon2Large", 1e-5);
   double targetError = shci_data_->get<double>("targetError", 1e-4);
   double dE = shci_data_->get<double>("dE", 1e-8);
   int nroot = nstate_;
-  int sampleN = shci_data_->get<int>("sampleN", 200);
+  int sampleN = shci_data_->get<int>("sampleN", 100);
 
   ofstream fs("input.dat");
   fs << "#system" << endl;
@@ -459,7 +467,11 @@ void ZSHCI::write_dice_input() {
   }*/
   // Read guess determinant from input instead
   fs << "end" << endl;
-  
+  if (fullrestart && !first_iter_) {
+    restart = true;
+    sweep_iter = vector<int>(1,0);
+    sweep_epsilon = vector<double>(1, 10.0);
+  } 
   fs << "nroots " << nroot << endl;
   fs << "#variational" << endl;
   fs << "schedule" << endl;
@@ -475,21 +487,25 @@ void ZSHCI::write_dice_input() {
   }  
   fs << "#pt" << endl;
   if (PTiter != 0 || tight_) {
-    fs << (stochastic ? "stochastic" : "deterministic");
-    fs << endl;
+    if(!stochastic)
+      fs << "deterministic" << endl;
     fs << "epsilon2 " << epsilon2 << endl;
+    fs << "epsilon2Large " << epsilon2Large << endl;
+    fs << "targetError " << targetError << endl;
+    fs << "sampleN " << sampleN << endl;
   }
   else
     fs << "nPTiter 0" << endl;
-  fs << "sampleN 200" << endl;
 
   fs << "#misc" << endl;
   if (!io)
     fs << "noio" << endl;
   if (!trev)
     fs << "Treversal " << trev << endl;
-  fs << "DoSpinRDM" << endl;
-  fs << "DoOneRDM" << endl;
+  if (!tight_) {
+    fs << "DoSpinRDM" << endl;
+    fs << "DoOneRDM" << endl;
+  }
   fs << endl;
   fs.close();
 
